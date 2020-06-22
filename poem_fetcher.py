@@ -49,9 +49,13 @@ class UrlDb:
             print("Removing from DB failed.")
 
 class UrlCrawler:
-    def __init__(self, base_domain):
+    def __init__(self, url, base_domain):
         pass
-    def fetch(self, url):
+    def fetch(self):
+        pass
+    def get_url(self):
+        pass
+    def get_crawl_time(self):
         pass
 
 # Use BeautifulSoup to parse and extract information from a fetched page
