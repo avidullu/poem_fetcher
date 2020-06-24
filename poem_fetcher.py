@@ -48,48 +48,110 @@ class UrlDb:
             print(e)
             print("Removing from DB failed.")
 
+    def exists(self, url):
+        curr = self.conn.cursor()
+        logging.debug("Checking existence of url.", url, type(url))
+        try:
+          curr.execute("select count(*) from seen_urls where url = (?);", (url,))
+        except sqlite3.OperationalError as e:
+            print(e)
+            print("Checking url in DB failed.")
+        return curr.fetchone()[0] > 0
+
 class UrlCrawler:
-    def __init__(self, url, base_domain):
-        pass
-    def fetch(self):
-        pass
-    def get_url(self):
-        pass
+    _pool = None
+    _base = None
+    _url = None
+    _crawl_time = None
+    _contents = None
+    def __init__(self, base_domain):
+        self._pool = urllib3.PoolManager(10)
+        self._base = urllib.parse.urlparse(base_domain);
+
+    def fetch(self, url):
+        self._reset(url);
+        if self._url is not False:
+            self._crawl_time = datetime.datetime.now().isoformat()
+            resp = self._pool.request('GET', self_.url)
+            self._contents = resp.data
+        return self._contents is not False
+
+    def get_contents(self):
+        return self._contents
+    def is_success(self):
+        return self._contents
     def get_crawl_time(self):
-        pass
+        return self._crawl_time
+
+    def _reset(self, url):
+        self._crawl_time = False
+        self._contents = False
+        self._url = self._fix_url(url)
+
+    def _fix_url(self, url):
+        parsed = urllib.parse.urlparse(url)
+        if parsed.netloc is not False:
+            logging.debug("Nothing to do for: ", url)
+            return url
+        new_parsed = urllib.parse.ParseResult(self._base.scheme,
+                self._base.netloc, parsed.path, parsed.params,
+                parsed.query, parsed.fragment)
+        logging.debug("New formed url: ", new_parsed.geturl())
+        self._url = new_parsed.geturl()
 
 # Use BeautifulSoup to parse and extract information from a fetched page
 class Parser:
-    data = None
-    def __init__(self, data):
-        self.data = data
+    _soup = None
+    def __init__(self, data=None):
+        if data != None:
+            self._soup = BeautifulSoup(data)
+        else:
+            logging.info("Parser not initialized with data")
+    # Consider returning a generator
     def find_all(self, tag):
-        pass
+        if self._soup is not None:
+            return self._soup.find_all(tag)
+        else:
+            logging.error("Soup is not initialized with data.")
+    def set_data(self, data):
+        soup = BeautifulSoup(data)
 
 class UrlProcessor:
-    crawler = None
-    db = None
-    parser = None
-    def __init__(self, url, url_db, parser):
-        self.crawler = UrlCrawler()
-        self.db = url_db
-        self.parser = parser
+    _crawler = None
+    _db = None
+    _parser = None
+    def __init__(self, crawler, url_db, parser):
+        self._crawler = crawler
+        self._db = url_db
+        self._parser = parser
 
     def sanitized_url(self):
-        pass
+        self._parser.get_url()
     def get_all_urls(self):
         pass
     def find_all(self, tag):
         pass
 
 class CrawlDriver:
-    db = None
-    base_url = None
+    _db = None
+    _base_url = None
+    _crawler = None
+    _parser = None
     def __init__(self, db, base_url):
-        self.db = db
-        self.base_url = base_url
+        self._db = db
+        self._base_url = base_url
+        self._crawler = UrlCrawler(base_url)
+        self._parser = Parser()
     def run(self):
-        pass
+        # We start with the _base_url as the base crawl point and go from there
+        # Steps in the flow
+        # a. Start from a base url
+        # b. Fetch the url, update it in the Db
+        # c. Get all the links from the page and insert all of them
+        #    in the db (which do not already exist and matches the base domain)
+        # d. Read the db and fetch more
+        if not self._db.exists(self._base_url):
+            self._db.add_url(self._base_url)
     def _get_urls_from_table(self, num_to_fetch=10):
         pass
     def _mark_url_processed(self, url):
