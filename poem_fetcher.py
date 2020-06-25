@@ -66,19 +66,18 @@ class UrlCrawler:
     _contents = None
     def __init__(self, base_domain):
         self._pool = urllib3.PoolManager(10)
-        self._base = urllib.parse.urlparse(base_domain);
+        self._base = urllib.parse.urlparse(base_domain)
+        print("Netloc of base: ", self._base.netloc)
 
     def fetch(self, url):
         self._reset(url);
         if self._url is not False:
             self._crawl_time = datetime.datetime.now().isoformat()
-            resp = self._pool.request('GET', self_.url)
+            resp = self._pool.request('GET', self._url)
             self._contents = resp.data
         return self._contents is not False
 
     def get_contents(self):
-        return self._contents
-    def is_success(self):
         return self._contents
     def get_crawl_time(self):
         return self._crawl_time
@@ -99,6 +98,10 @@ class UrlCrawler:
         logging.debug("New formed url: ", new_parsed.geturl())
         self._url = new_parsed.geturl()
 
+    def is_from_base_domain(self, url):
+        parsed = urllib.parse.urlparse(url)
+        return len(parsed.netloc) == 0 or parsed.netloc == self._base.netloc
+
 # Use BeautifulSoup to parse and extract information from a fetched page
 class Parser:
     _soup = None
@@ -113,8 +116,8 @@ class Parser:
             return self._soup.find_all(tag)
         else:
             logging.error("Soup is not initialized with data.")
-    def set_data(self, data):
-        soup = BeautifulSoup(data)
+    def set_data(self, data, format="html.parser"):
+        self._soup = BeautifulSoup(data, format)
 
 class UrlProcessor:
     _crawler = None
@@ -152,13 +155,34 @@ class CrawlDriver:
         # d. Read the db and fetch more
         if not self._db.exists(self._base_url):
             self._db.add_url(self._base_url)
+        if not self._crawler.fetch(self._base_url):
+            logging.error("Aborting. Could not fetch base url: ", self._base_url)
+            sys.exit(1)
+        if self._crawler.get_contents() == False:
+            logging.error("Aborting. Found empty content in base url: ", self._base_url)
+            sys.exit(1)
+        self._parser.set_data(self._crawler.get_contents())
+        a_tags = self._parser.find_all("a")
+        href_text = {}
+        for a_tag in a_tags:
+            if a_tag.has_attr('href') and self._crawler.is_from_base_domain(a_tag['href']):
+                href_text[a_tag['href']] = a_tag.get_text()
+            else:
+                if a_tag.has_attr('href'):
+                        print(a_tag['href'])
+        print("Total number of links extracted: ", len(a_tags))
+        print("Total number of links from domain extracted: ", len(href_text))
+        for link in href_text.keys():
+            self._db.add_url(link)
+
+
     def _get_urls_from_table(self, num_to_fetch=10):
         pass
     def _mark_url_processed(self, url):
         pass
 
 def main():
-    base_domain = 'http://www.kavitakosh.org'
+    base_domain = 'http://kavitakosh.org'
     db_path = 'kavita_kosh.db'
     print("We are starting to crawl ", base_domain)
     print("We are using", db_path, " as the db to store our information.")
