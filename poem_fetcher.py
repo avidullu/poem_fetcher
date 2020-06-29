@@ -7,6 +7,8 @@ import argparse
 import sys
 import logging
 
+from crawler.crawler import UrlCrawler
+
 class UrlDb:
     conn = None
     def __init__(self, db_path):
@@ -57,50 +59,6 @@ class UrlDb:
             print(e)
             print("Checking url in DB failed.")
         return curr.fetchone()[0] > 0
-
-class UrlCrawler:
-    _pool = None
-    _base = None
-    _url = None
-    _crawl_time = None
-    _contents = None
-    def __init__(self, base_domain):
-        self._pool = urllib3.PoolManager(10)
-        self._base = urllib.parse.urlparse(base_domain)
-        print("Netloc of base: ", self._base.netloc)
-
-    def fetch(self, url):
-        self._reset(url);
-        if self._url is not False:
-            self._crawl_time = datetime.datetime.now().isoformat()
-            resp = self._pool.request('GET', self._url)
-            self._contents = resp.data
-        return self._contents is not False
-
-    def get_contents(self):
-        return self._contents
-    def get_crawl_time(self):
-        return self._crawl_time
-
-    def _reset(self, url):
-        self._crawl_time = False
-        self._contents = False
-        self._url = self._fix_url(url)
-
-    def _fix_url(self, url):
-        parsed = urllib.parse.urlparse(url)
-        if parsed.netloc is not False:
-            logging.debug("Nothing to do for: ", url)
-            return url
-        new_parsed = urllib.parse.ParseResult(self._base.scheme,
-                self._base.netloc, parsed.path, parsed.params,
-                parsed.query, parsed.fragment)
-        logging.debug("New formed url: ", new_parsed.geturl())
-        self._url = new_parsed.geturl()
-
-    def is_from_base_domain(self, url):
-        parsed = urllib.parse.urlparse(url)
-        return len(parsed.netloc) == 0 or parsed.netloc == self._base.netloc
 
 # Use BeautifulSoup to parse and extract information from a fetched page
 class Parser:
@@ -173,7 +131,7 @@ class CrawlDriver:
         print("Total number of links extracted: ", len(a_tags))
         print("Total number of links from domain extracted: ", len(href_text))
         for link in href_text.keys():
-            self._db.add_url(link)
+            self._db.add_url(self._crawler.canonicalize_url(link))
 
 
     def _get_urls_from_table(self, num_to_fetch=10):
