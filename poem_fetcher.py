@@ -1,47 +1,10 @@
-import datetime
-import urllib
-import urllib3
-from bs4 import BeautifulSoup
 import argparse
 import sys
 import logging
 
 from crawler.crawler import UrlCrawler
 from db.url_db import UrlDb
-
-
-# Use BeautifulSoup to parse and extract information from a fetched page
-class Parser:
-    _soup = None
-    def __init__(self, data=None):
-        if data != None:
-            self._soup = BeautifulSoup(data)
-        else:
-            logging.info("Parser not initialized with data")
-    # Consider returning a generator
-    def find_all(self, tag):
-        if self._soup is not None:
-            return self._soup.find_all(tag)
-        else:
-            logging.error("Soup is not initialized with data.")
-    def set_data(self, data, format="html.parser"):
-        self._soup = BeautifulSoup(data, format)
-
-class UrlProcessor:
-    _crawler = None
-    _db = None
-    _parser = None
-    def __init__(self, crawler, url_db, parser):
-        self._crawler = crawler
-        self._db = url_db
-        self._parser = parser
-
-    def sanitized_url(self):
-        self._parser.get_url()
-    def get_all_urls(self):
-        pass
-    def find_all(self, tag):
-        pass
+from parser.parser import Parser
 
 class CrawlDriver:
     _db = None
