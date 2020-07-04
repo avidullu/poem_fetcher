@@ -7,7 +7,8 @@ class UrlDb:
     conn = None
     def __init__(self, db_path):
         try:
-          self.conn = sqlite3.connect(db_path)
+          # PARSE_DECLTYPES for parsing dates as python format
+          self.conn = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
         except sqlite3.OperationalError as e:
             print (e)
             sys.exit("DB connection error. Aborting")
@@ -22,13 +23,15 @@ class UrlDb:
         tables = c.fetchall()
         [print(table) for table in tables]
 
-    def add_url(self, url):
+    def add_url(self, url, seen_time=None, crawl_time=None):
         curr = self.conn.cursor()
-        now_time = datetime.datetime.now().isoformat()
-        logging.debug("Inserting url: ", url, type(url), now_time, type(now_time))
+        # seen_time can be the same as add time but the crawl time need to be provided by caller
+        if seen_time is None:
+          seen_time = datetime.datetime.now().isoformat()
+        logging.debug("Inserting url: ", url, type(url), seen_time, type(seen_time))
         try:
-          curr.execute("insert into seen_urls values(?, ?);",
-                       (url, now_time))
+          curr.execute("insert into seen_urls values(?, ?, ?);",
+                       (url, seen_time, crawl_time))
           self.conn.commit()
         except sqlite3.OperationalError as e:
             print(e)
@@ -45,11 +48,41 @@ class UrlDb:
             print("Removing from DB failed.")
 
     def exists(self, url):
+        assert len(url) > 0
         curr = self.conn.cursor()
         logging.debug("Checking existence of url.", url, type(url))
         try:
-          curr.execute("select count(*) from seen_urls where url = (?);", (url,))
+          curr.execute("select url from seen_urls where url = (?);", (url,))
+        except sqlite3.InterfaceError as e:
+            print(e)
+            print("Checking url in DB failed: ", url)
+        return len(curr.fetchall()) > 0
+
+    def read(self, max_url_time=None, max_to_fetch=100):
+        if max_url_time is None:
+            max_url_time = datetime.datetime.now().isoformat()
+        curr = self.conn.cursor()
+        print("Reading urls which were crawled before: ", max_url_time)
+        try:
+          curr.execute("select url from seen_urls where seen_time < (?) limit (?);",
+                  (max_url_time, max_to_fetch,))
+        except sqlite3.OperationalError as e:
+            print(e)
+            print("Fetching from URL DB failed.")
+        all_fetched = curr.fetchall()
+        print("All items read size: ", len(all_fetched))
+        ret_val = []
+        while len(all_fetched) > 0:
+            ret_val.append(all_fetched.pop()[0])
+        return ret_val
+
+    def get_total(self):
+        curr = self.conn.cursor()
+        logging.debug("Checking total number of urls in the DB")
+        try:
+          curr.execute("select count(*) from seen_urls;")
         except sqlite3.OperationalError as e:
             print(e)
             print("Checking url in DB failed.")
-        return curr.fetchone()[0] > 0
+        return curr.fetchone()[0]
+
