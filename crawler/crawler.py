@@ -30,12 +30,12 @@ class UrlCrawler:
     def canonicalize_url(self, url):
         parsed = urllib.parse.urlparse(url)
         if len(parsed.netloc) > 0:
-            logging.debug("Nothing to do for: ", url)
+            logging.debug("Nothing to do for: %s", url)
             return url
         new_parsed = urllib.parse.ParseResult(self._base.scheme,
                 self._base.netloc, parsed.path, parsed.params,
                 parsed.query, parsed.fragment)
-        logging.debug("New formed url: ", new_parsed.geturl())
+        logging.debug("New formed url: %s", new_parsed.geturl())
         return new_parsed.geturl()
 
     def is_from_base_domain(self, url):
