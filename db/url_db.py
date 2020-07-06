@@ -6,21 +6,23 @@ import datetime
 class UrlDb:
     _conn = None
     _recorded_urls_table = "seen_urls"
+
     def __init__(self, db_path):
         try:
-          # PARSE_DECLTYPES for parsing dates as python format
-          self._conn = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
+            # PARSE_DECLTYPES for parsing dates as python format
+            self._conn = sqlite3.connect(db_path,
+                                         detect_types=sqlite3.PARSE_DECLTYPES)
         except sqlite3.OperationalError as e:
-            print (e)
+            print(e)
             sys.exit("DB connection error. Aborting")
 
     def print_tables(self):
         c = self._conn.cursor()
         try:
-          c.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            c.execute("SELECT name FROM sqlite_master WHERE type='table';")
         except sqlite3.OperationalError as e:
             print(e)
-            sys.exit("Reading from DB failed. Aborting");
+            sys.exit("Reading from DB failed. Aborting")
         tables = c.fetchall()
         [print(table) for table in tables]
 
@@ -28,12 +30,12 @@ class UrlDb:
         curr = self._conn.cursor()
         # seen_time can be the same as add time but the crawl time need to be provided by caller
         if seen_time is None:
-          seen_time = datetime.datetime.now().isoformat()
+            seen_time = datetime.datetime.now().isoformat()
         logging.debug("Inserting url: %s %s", url, seen_time)
         try:
-          curr.execute("insert into seen_urls values(?, ?, ?);",
-                       (url, seen_time, crawl_time))
-          self._conn.commit()
+            curr.execute("insert into seen_urls values(?, ?, ?);",
+                         (url, seen_time, crawl_time))
+            self._conn.commit()
         except sqlite3.OperationalError as e:
             print(e)
             print("Writing to DB failed.")
@@ -44,8 +46,8 @@ class UrlDb:
         curr = self._conn.cursor()
         logging.debug("Removing url: %s", url)
         try:
-          curr.execute("delete from seen_urls where url = (?);", (url,))
-          self._conn.commit()
+            curr.execute("delete from seen_urls where url = (?);", (url, ))
+            self._conn.commit()
         except sqlite3.OperationalError as e:
             print(e)
             print("Removing from DB failed.")
@@ -57,7 +59,7 @@ class UrlDb:
         curr = self._conn.cursor()
         logging.debug("Checking existence of url: %s", url)
         try:
-          curr.execute("select url from seen_urls where url = (?);", (url,))
+            curr.execute("select url from seen_urls where url = (?);", (url, ))
         except sqlite3.InterfaceError as e:
             print(e)
             print("Checking url in DB failed: ", url)
@@ -68,11 +70,15 @@ class UrlDb:
         if max_url_time is None:
             max_url_time = datetime.datetime.now().isoformat()
         curr = self._conn.cursor()
-        logging.info("Reading urls which were crawled before: %s", max_url_time)
+        logging.info("Reading urls which were crawled before: %s",
+                     max_url_time)
         ret_val = []
         try:
-          curr.execute("select url from seen_urls where seen_time < (?) limit (?);",
-                  (max_url_time, max_to_fetch,))
+            curr.execute(
+                "select url from seen_urls where seen_time < (?) limit (?);", (
+                    max_url_time,
+                    max_to_fetch,
+                ))
         except sqlite3.OperationalError as e:
             print(e)
             print("Fetching from URL DB failed.")
@@ -87,10 +93,9 @@ class UrlDb:
         curr = self._conn.cursor()
         logging.debug("Checking total number of urls in the DB")
         try:
-          curr.execute("select count(*) from seen_urls;")
+            curr.execute("select count(*) from seen_urls;")
         except sqlite3.OperationalError as e:
             print(e)
             print("Checking url in DB failed.")
             return -1
         return curr.fetchone()[0]
-

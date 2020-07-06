@@ -6,6 +6,7 @@ from crawler.crawler import UrlCrawler
 from db.url_db import UrlDb
 from parser.parser import Parser
 
+
 class CrawlDriver:
     _db = None
     _base_url = None
@@ -24,7 +25,8 @@ class CrawlDriver:
     def run(self):
         logging.info("Total URLs in the DB: %d", self._db.get_total())
         urls = [self._base_url]
-        while len(urls) > 0 and self._urls_processed < self._max_urls_to_process:
+        while len(
+                urls) > 0 and self._urls_processed < self._max_urls_to_process:
             for u in urls:
                 self._init_db(u, False)
             urls = self._get_urls_from_table(1000000)
@@ -53,21 +55,26 @@ class CrawlDriver:
             logging.error("Aborting. Could not fetch base url: %s", base_url)
             sys.exit(1)
         if self._crawler.get_contents() == '':
-            logging.error("Aborting. Found empty content in base url: %s ", base_url)
+            logging.error("Aborting. Found empty content in base url: %s ",
+                          base_url)
             sys.exit(1)
 
         self._parser.set_data(self._crawler.get_contents())
         a_tags = self._parser.find_all("a")
         href_text = {}
         for a_tag in a_tags:
-            if a_tag.has_attr('href') and self._crawler.is_from_base_domain(a_tag['href']):
+            if a_tag.has_attr('href') and self._crawler.is_from_base_domain(
+                    a_tag['href']):
                 href_text[a_tag['href']] = a_tag.get_text()
         logging.debug("Total number of links extracted: %d", len(a_tags))
-        logging.debug("Total number of links from domain extracted: %d", len(href_text))
+        logging.debug("Total number of links from domain extracted: %d",
+                      len(href_text))
         num_new = 0
         for link in href_text.keys():
             canonicalized_link = self._crawler.canonicalize_url(link)
-            if not self._db.exists(canonicalized_link) and self._urls_processed < self._max_urls_to_process:
+            if not self._db.exists(
+                    canonicalized_link
+            ) and self._urls_processed < self._max_urls_to_process:
                 self._db.add_url(canonicalized_link)
                 num_new += 1
                 self._urls_processed += 1
@@ -80,22 +87,37 @@ class CrawlDriver:
     def _mark_url_processed(self, url):
         pass
 
+
 # Gets a disctionary of all flags parsed.
 def SetupLogger(flags):
     logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s '
-            '[%(filename)s:%(lineno)d] %(message)s',
-            datefmt='%Y-%m-%d:%H:%M:%S', level=flags['log'])
+                        '[%(filename)s:%(lineno)d] %(message)s',
+                        datefmt='%Y-%m-%d:%H:%M:%S',
+                        level=flags['log'])
+
 
 # Returns a dict of all parsed flags.
 def ProcessArgs():
-    parser = argparse.ArgumentParser(description='Crawl and process hindi poems')
+    parser = argparse.ArgumentParser(
+        description='Crawl and process hindi poems')
     parser.add_argument('--max_urls_to_process',
-            help='Maximum number of urls to visit', type=int, required=True)
-    parser.add_argument('--db_path', help='Path to the DB', type=str,
-            default='kavita_kosh2.db', required=False)
-    parser.add_argument('--base_domain', help='Base domain to start crawl',
-            type=str, default='http://kavitakosh.org', required=False)
-    parser.add_argument('--log', help='logging level', type=str, default="WARNING")
+                        help='Maximum number of urls to visit',
+                        type=int,
+                        required=True)
+    parser.add_argument('--db_path',
+                        help='Path to the DB',
+                        type=str,
+                        default='kavita_kosh2.db',
+                        required=False)
+    parser.add_argument('--base_domain',
+                        help='Base domain to start crawl',
+                        type=str,
+                        default='http://kavitakosh.org',
+                        required=False)
+    parser.add_argument('--log',
+                        help='logging level',
+                        type=str,
+                        default="WARNING")
     args = parser.parse_args()
     flags = {}
     flags['max_urls_to_process'] = args.max_urls_to_process
@@ -107,16 +129,19 @@ def ProcessArgs():
     flags['db_path'] = args.db_path
     return flags
 
+
 def main():
     flags = ProcessArgs()
     print("All flags passed.")
     [print(f) for f in flags.items()]
     SetupLogger(flags)
     print("We are starting to crawl ", flags['base_domain'])
-    print("We are using", flags['db_path'], " as the db to store our information.")
+    print("We are using", flags['db_path'],
+          " as the db to store our information.")
     db = UrlDb(flags['db_path'])
     driver = CrawlDriver(db, flags)
     driver.run()
+
 
 if __name__ == "__main__":
     main()
