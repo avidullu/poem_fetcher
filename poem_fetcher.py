@@ -14,6 +14,7 @@ class CrawlDriver:
     _parser = None
     _max_urls_to_process = 0
     _urls_processed = 0
+    _only_base_domain_urls = False
 
     def __init__(self, db, flags):
         self._db = db
@@ -21,6 +22,7 @@ class CrawlDriver:
         self._parser = Parser()
         self._base_url = flags['base_domain']
         self._max_urls_to_process = flags['max_urls_to_process']
+        self._only_base_domain_urls = flags['only_include_base_domain_urls']
 
     def run(self):
         logging.info("Total URLs in the DB: %d", self._db.get_total())
@@ -74,7 +76,9 @@ class CrawlDriver:
             canonicalized_link = self._crawler.canonicalize_url(link)
             if not self._db.exists(
                     canonicalized_link
-            ) and self._urls_processed < self._max_urls_to_process:
+            ) and self._urls_processed < self._max_urls_to_process and (
+                    self._only_base_domain_urls == False
+                    or self._crawler.is_from_base_domain(canonicalized_link)):
                 self._db.add_url(canonicalized_link)
                 num_new += 1
                 self._urls_processed += 1
@@ -117,17 +121,15 @@ def ProcessArgs():
     parser.add_argument('--log',
                         help='logging level',
                         type=str,
-                        default="WARNING")
+                        default="WARNING")  # NOTSET
+    parser.add_argument(
+        '--only_include_base_domain_urls',
+        help='Only crawl and process URLs from the base domain.',
+        type=bool,
+        default=True,
+        required=False)
     args = parser.parse_args()
-    flags = {}
-    flags['max_urls_to_process'] = args.max_urls_to_process
-    numeric_level = getattr(logging, args.log.upper(), None)
-    if not isinstance(numeric_level, int):
-        raise ValueError('Invalid log level: %s' % args.log)
-    flags['log'] = numeric_level
-    flags['base_domain'] = args.base_domain
-    flags['db_path'] = args.db_path
-    return flags
+    return vars(args)
 
 
 def main():

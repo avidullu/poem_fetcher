@@ -10,6 +10,7 @@ class UrlCrawler:
     _url = None
     _crawl_time = None
     _contents = None
+    _is_redirect = False
 
     def __init__(self, base_domain):
         self._pool = urllib3.PoolManager(10)
@@ -22,6 +23,9 @@ class UrlCrawler:
             self._crawl_time = datetime.datetime.now().isoformat()
             resp = self._pool.request('GET', self._url)
             self._contents = resp.data
+            self._is_redirect = resp.geturl() != self._url
+            if self._is_redirect == True:
+                logging.error("Redirect found: %s", self._url)
         return self._contents is not False
 
     def get_contents(self):
@@ -50,3 +54,4 @@ class UrlCrawler:
         self._crawl_time = False
         self._contents = False
         self._url = self.canonicalize_url(url)
+        self._is_redirect = False
