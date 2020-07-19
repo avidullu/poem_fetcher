@@ -26,7 +26,7 @@ class Parser:
         for elm in elements:
             if elm is not None and elm.has_attr(
                     attr) and elm.get_attribute_list(attr).count(prop) > 0:
-                logging.info("Found %s in div of attr: %s", prop, attr)
+                logging.info("Found %s in div of attr %s, value %s", prop, attr, elm.getText())
                 return elm.getText()
         return None
 
