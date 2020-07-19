@@ -16,7 +16,7 @@ class UrlCrawler:
     def __init__(self, base_domain):
         self._pool = urllib3.PoolManager(10)
         self._base = urllib.parse.urlparse(base_domain)
-        print("Netloc of base: ", self._base.netloc)
+        logging.info("Netloc of base: %s", self._base.netloc)
 
     def fetch(self, url):
         self._reset(url)
@@ -26,7 +26,7 @@ class UrlCrawler:
             self._contents = resp.data
             self._is_redirect = resp.geturl() != self._url
             if self._is_redirect is True:
-                logging.error("Redirect found: %s", self._url)
+                logging.debug("Redirect found: %s", self._url)
         return self._contents is not False
 
     def get_contents(self):

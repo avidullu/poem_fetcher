@@ -48,8 +48,8 @@ class UrlDb:
     def add_fetched_content(self, url, heading=None, poem=None):
         curr = self._conn.cursor()
         if poem is None or heading is None:
-            logging.critical(
-                "Both of heading or poem should be available. Quitting")
+            logging.debug("Both of heading or poem should be available: %s",
+                          url)
             return False
         logging.debug("Inserting crawled url: %s", url)
         try:
@@ -116,7 +116,8 @@ class UrlDb:
         ret_val = []
         try:
             curr.execute(
-                "select url from seen_urls where seen_time < (?) limit (?);", (
+                "select url, seen_time from seen_urls where seen_time < (?) order by 2 desc limit (?);",
+                (
                     max_url_time,
                     max_to_fetch,
                 ))

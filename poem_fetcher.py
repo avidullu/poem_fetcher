@@ -1,5 +1,6 @@
 import argparse
 import logging
+import random
 import sys
 
 from crawler.crawler import UrlCrawler
@@ -44,7 +45,9 @@ class CrawlDriver:
                     logging.debug("Max number of URLs processed. Skipping.")
                     break
                 self._process_url(u)
-            urls = self._get_seen_urls(1000000)
+            # TODO: Should not fetch this high number of URLs.
+            urls = self._get_seen_urls(100000)
+            random.shuffle(urls)
         logging.info("Total URLs in the DB: %d", self._db.get_total_seen())
 
     def _process_url(self, url):
