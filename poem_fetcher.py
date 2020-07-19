@@ -44,7 +44,7 @@ class CrawlDriver:
                     logging.debug("Max number of URLs processed. Skipping.")
                     break
                 self._process_url(u)
-            urls = self._get_urls_from_table(1000000)
+            urls = self._get_seen_urls(1000000)
         logging.info("Total URLs in the DB: %d", self._db.get_total_seen())
 
     def _process_url(self, url):
@@ -63,7 +63,6 @@ class CrawlDriver:
         self._urls_processed += 1
         self._parser.set_data(self._crawler.get_contents())
         num_new = self._add_new_seen_urls()
-        logging.info("Number of new URLs found: %s", num_new)
 
         if self._db.is_content_fetched(url) is False:
             heading = self._parser.find_element('h1', 'class', 'firstHeading')
@@ -77,7 +76,7 @@ class CrawlDriver:
 
         return num_new
 
-    def _get_urls_from_table(self, num_to_fetch=100):
+    def _get_seen_urls(self, num_to_fetch=100):
         return self._db.read(max_to_fetch=num_to_fetch)
 
     # Static set of rules for some urls which need not be crawled.
@@ -87,24 +86,18 @@ class CrawlDriver:
 
     def _add_new_seen_urls(self):
         a_tags = self._parser.find_all("a")
-        href_text = {}
-        for a_tag in a_tags:
-            if a_tag.has_attr('href') and self._crawler.is_from_base_domain(
-                    a_tag['href']):
-                href_text[a_tag['href']] = a_tag.get_text()
-        logging.debug("Total number of links extracted: %d", len(a_tags))
-        logging.debug("Total number of links from domain extracted: %d",
-                      len(href_text))
+        logging.debug("All href links in the page %d", len(a_tags))
         num_new = 0
-        for link in href_text.keys():
-            canonicalized_link = self._crawler.canonicalize_url(link)
-            if self._should_crawl_url(
-                    canonicalized_link
-            ) and not self._db.is_seen(canonicalized_link) and (
-                    self._only_base_domain_urls is False
-                    or self._crawler.is_from_base_domain(canonicalized_link)):
-                self._db.add_seen_url(canonicalized_link)
-                num_new += 1
+        for a_tag in a_tags:
+            if a_tag.has_attr('href'):
+                url = self._crawler.canonicalize_url(a_tag['href'])
+                if self._should_crawl_url(url) and (
+                        self._only_base_domain_urls is False
+                        or self._crawler.is_from_base_domain(url)
+                ) and not self._db.is_seen(url):
+                    self._db.add_seen_url(url)
+                    num_new += 1
+        logging.debug("Number of new URLs found: %s", num_new)
         return num_new
 
 
