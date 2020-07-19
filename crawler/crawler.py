@@ -1,7 +1,8 @@
-import urllib3
 import datetime
-import urllib
 import logging
+import urllib
+
+import urllib3
 
 
 class UrlCrawler:
@@ -40,9 +41,11 @@ class UrlCrawler:
             logging.debug("Nothing to do for: %s", url)
             return url
         new_parsed = urllib.parse.ParseResult(self._base.scheme,
-                                              self._base.netloc, parsed.path,
-                                              parsed.params, parsed.query,
-                                              parsed.fragment)
+                                              self._base.netloc,
+                                              parsed.path,
+                                              parsed.params,
+                                              parsed.query,
+                                              fragment='')  # Empty fragment
         logging.debug("New formed url: %s", new_parsed.geturl())
         return new_parsed.geturl()
 
