@@ -25,7 +25,7 @@ class UrlCrawler:
             resp = self._pool.request('GET', self._url)
             self._contents = resp.data
             self._is_redirect = resp.geturl() != self._url
-            if self._is_redirect == True:
+            if self._is_redirect is True:
                 logging.error("Redirect found: %s", self._url)
         return self._contents is not False
 

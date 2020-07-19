@@ -43,11 +43,11 @@ class CrawlDriver:
                 if self._urls_processed > self._max_urls_to_process:
                     logging.debug("Max number of URLs processed. Skipping.")
                     break
-                self._init_db(u, False)
+                self._process_url(u)
             urls = self._get_urls_from_table(1000000)
         logging.info("Total URLs in the DB: %d", self._db.get_total_seen())
 
-    def _init_db(self, url, skip_if_present=False):
+    def _process_url(self, url):
         logging.info("Processing url: %s", url)
 
         # TODO: This should check for the time when this was crawled eg. is_recently_crawled(url)
@@ -81,7 +81,8 @@ class CrawlDriver:
         return self._db.read(max_to_fetch=num_to_fetch)
 
     # Static set of rules for some urls which need not be crawled.
-    def _should_crawl_url(self, url):
+    @staticmethod
+    def _should_crawl_url(url):
         return url.count(':Random') == 0
 
     def _add_new_seen_urls(self):
@@ -100,7 +101,7 @@ class CrawlDriver:
             if self._should_crawl_url(
                     canonicalized_link
             ) and not self._db.is_seen(canonicalized_link) and (
-                    self._only_base_domain_urls == False
+                    self._only_base_domain_urls is False
                     or self._crawler.is_from_base_domain(canonicalized_link)):
                 self._db.add_seen_url(canonicalized_link)
                 num_new += 1

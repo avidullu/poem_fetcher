@@ -13,7 +13,7 @@ class UrlDb:
             self._conn = sqlite3.connect(db_path,
                                          detect_types=sqlite3.PARSE_DECLTYPES)
         except sqlite3.OperationalError as e:
-            print(e)
+            logging.critical("Initializing DB module failed: %s", e)
             sys.exit("DB connection error. Aborting")
 
     def add_seen_url(self, url, seen_time=None, crawl_time=None):
@@ -27,8 +27,7 @@ class UrlDb:
                          (url, seen_time, crawl_time))
             self._conn.commit()
         except sqlite3.OperationalError as e:
-            print(e)
-            print("Writing to DB failed.")
+            logging.critical("Writing to DB failed %s", e)
             return False
         return True
 
@@ -42,8 +41,7 @@ class UrlDb:
                          (url, seen_time, crawl_time))
             self._conn.commit()
         except sqlite3.OperationalError as e:
-            logging.critical("Writing to crawled DB failed with: %s",
-                             e.message)
+            logging.critical("Writing to crawled DB failed with: %s", e)
             return False
         return True
 
@@ -59,8 +57,7 @@ class UrlDb:
                          (url, heading, poem))
             self._conn.commit()
         except sqlite3.OperationalError as e:
-            logging.critical("Writing to content DB failed with: %s",
-                             e.message)
+            logging.critical("Writing to content DB failed with: %s", e)
             return False
         return True
 
@@ -72,8 +69,7 @@ class UrlDb:
             curr.execute("select url from fetched_content where url = (?);",
                          (url, ))
         except sqlite3.InterfaceError as e:
-            logging.critical("Checking %s in seen DB failed: %s ", url,
-                             e.message)
+            logging.critical("Checking %s in seen DB failed: %s ", url, e)
             return False
         return len(curr.fetchall()) > 0
 
@@ -84,7 +80,7 @@ class UrlDb:
             curr.execute("delete from seen_urls where url = (?);", (url, ))
             self._conn.commit()
         except sqlite3.OperationalError as e:
-            logging.critical("Removing from DB failed with: %s", e.message)
+            logging.critical("Removing from DB failed with: %s", e)
             return False
         return True
 
@@ -95,8 +91,7 @@ class UrlDb:
         try:
             curr.execute("select url from seen_urls where url = (?);", (url, ))
         except sqlite3.InterfaceError as e:
-            logging.critical("Checking %s in seen DB failed: %s ", url,
-                             e.message)
+            logging.critical("Checking %s in seen DB failed: %s ", url, e)
             return False
         return len(curr.fetchall()) > 0
 
@@ -108,8 +103,7 @@ class UrlDb:
             curr.execute("select url from crawled_urls where url = (?);",
                          (url, ))
         except sqlite3.InterfaceError as e:
-            logging.critical("Checking %s in crawled DB failed: %s", url,
-                             e.message)
+            logging.critical("Checking %s in crawled DB failed: %s", url, e)
             return False
         return len(curr.fetchall()) > 0
 
@@ -127,7 +121,7 @@ class UrlDb:
                     max_to_fetch,
                 ))
         except sqlite3.OperationalError as e:
-            logging.critical("Fetching from URL DB failed %s", e.message)
+            logging.critical("Fetching from URL DB failed %s", e)
             return ret_val
         all_fetched = curr.fetchall()
         logging.info("All items read size: %d", len(all_fetched))
@@ -141,7 +135,7 @@ class UrlDb:
         try:
             curr.execute("select count(*) from seen_urls;")
         except sqlite3.OperationalError as e:
-            logging.critical("Checking total urls in DB failed: %s", e.message)
+            logging.critical("Checking total urls in DB failed: %s", e)
             return -1
         return curr.fetchone()[0]
 
@@ -151,7 +145,7 @@ class UrlDb:
         try:
             curr.execute("select count(*) from crawled_urls;")
         except sqlite3.OperationalError as e:
-            logging.critical("Checking total urls in DB failed: %s", e.message)
+            logging.critical("Checking total urls in DB failed: %s", e)
             return -1
         return curr.fetchone()[0]
 
