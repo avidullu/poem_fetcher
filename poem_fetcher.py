@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import logging
 import random
 import sys
@@ -67,11 +68,8 @@ class CrawlDriver:
         self._parser.set_data(self._crawler.get_contents())
         num_new = self._add_new_seen_urls()
 
-        if self._db.is_content_fetched(url) is False:
-            heading = self._parser.find_element('h1', 'class', 'firstHeading')
-            poem = self._parser.find_element('div', 'class', 'poem')
-            self._db.add_fetched_content(url, heading, poem)
-            self._content_fetched_urls += 1
+        # Update the db with the contents of this url
+        self._process_content(url)
 
         # If fails, it's not a critical error to stop processing
         if not self._db.add_crawled_url(url):
@@ -79,8 +77,23 @@ class CrawlDriver:
 
         return num_new
 
+    def _process_content(self, url):
+        if self._db.is_content_fetched(url) is True:
+            return
+        heading = self._parser.find_element('h1', 'class', 'firstHeading')
+        poem = self._parser.find_element('div', 'class', 'poem')
+        if heading is None or poem is None:
+            logging.debug("Partial content. Skipping adding %s", url)
+            return
+        heading = self._parser.sanitize_text(heading)
+        poem = self._parser.sanitize_text(poem)
+        headingHash = hashlib.md5(heading.encode()).hexdigest()
+        poemHash = hashlib.md5(poem.encode()).hexdigest()
+        self._db.add_fetched_content(url, heading, headingHash, poem, poemHash)
+        self._content_fetched_urls += 1
+
     def _get_seen_urls(self, num_to_fetch=100):
-        return self._db.read(max_to_fetch=num_to_fetch)
+        return self._db.read_from_seen(max_to_fetch=num_to_fetch)
 
     # Static set of rules for some urls which need not be crawled.
     @staticmethod

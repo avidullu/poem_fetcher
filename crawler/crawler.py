@@ -1,6 +1,6 @@
 import datetime
 import logging
-import urllib
+from urllib.parse import urlparse, ParseResult
 
 import urllib3
 
@@ -15,7 +15,7 @@ class UrlCrawler:
 
     def __init__(self, base_domain):
         self._pool = urllib3.PoolManager(10)
-        self._base = urllib.parse.urlparse(base_domain)
+        self._base = urlparse(base_domain, allow_fragments=False)
         logging.info("Netloc of base: %s", self._base.netloc)
 
     def fetch(self, url):
@@ -36,21 +36,21 @@ class UrlCrawler:
         return self._crawl_time
 
     def canonicalize_url(self, url):
-        parsed = urllib.parse.urlparse(url)
+        parsed = urlparse(url, allow_fragments=False)
         if len(parsed.netloc) > 0:
             logging.debug("Nothing to do for: %s", url)
             return url
-        new_parsed = urllib.parse.ParseResult(self._base.scheme,
-                                              self._base.netloc,
-                                              parsed.path,
-                                              parsed.params,
-                                              parsed.query,
-                                              fragment='')  # Empty fragment
+        new_parsed = ParseResult(self._base.scheme,
+                                 self._base.netloc,
+                                 parsed.path,
+                                 parsed.params,
+                                 parsed.query,
+                                 fragment='')  # Empty fragment
         logging.debug("New formed url: %s", new_parsed.geturl())
         return new_parsed.geturl()
 
     def is_from_base_domain(self, url):
-        parsed = urllib.parse.urlparse(url)
+        parsed = urlparse(url, allow_fragments=False)
         return len(parsed.netloc) == 0 or parsed.netloc == self._base.netloc
 
     def _reset(self, url):

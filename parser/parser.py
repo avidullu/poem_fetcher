@@ -33,3 +33,8 @@ class Parser:
 
     def set_data(self, data, format="html.parser"):
         self._soup = BeautifulSoup(data, format)
+
+    @staticmethod
+    def sanitize_text(text):
+        text = text.strip()
+        return text

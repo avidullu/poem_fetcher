@@ -45,7 +45,7 @@ class UrlDb:
             return False
         return True
 
-    def add_fetched_content(self, url, heading=None, poem=None):
+    def add_fetched_content(self, url, heading, headingHash, poem, poemHash):
         curr = self._conn.cursor()
         if poem is None or heading is None:
             logging.debug("Both of heading or poem should be available: %s",
@@ -53,31 +53,31 @@ class UrlDb:
             return False
         logging.debug("Inserting crawled url: %s", url)
         try:
-            curr.execute("insert into fetched_content values(?, ?, ?);",
-                         (url, heading, poem))
+            curr.execute("insert into fetched_content values(?, ?, ?, ?, ?);",
+                         (url, heading, poem, headingHash, poemHash))
             self._conn.commit()
         except sqlite3.OperationalError as e:
             logging.critical("Writing to content DB failed with: %s", e)
             return False
         return True
 
-    def is_content_fetched(self, url):
-        assert len(url) > 0
-        curr = self._conn.cursor()
-        logging.debug("Checking existence of url: %s", url)
-        try:
-            curr.execute("select url from fetched_content where url = (?);",
-                         (url, ))
-        except sqlite3.InterfaceError as e:
-            logging.critical("Checking %s in seen DB failed: %s ", url, e)
-            return False
-        return len(curr.fetchall()) > 0
-
-    def remove_url(self, url):
+    def remove_from_seen(self, url):
         curr = self._conn.cursor()
         logging.debug("Removing url: %s", url)
         try:
             curr.execute("delete from seen_urls where url = (?);", (url, ))
+            self._conn.commit()
+        except sqlite3.OperationalError as e:
+            logging.critical("Removing from DB failed with: %s", e)
+            return False
+        return True
+
+    def remove_from_fetched(self, url):
+        curr = self._conn.cursor()
+        logging.debug("Removing url: %s", url)
+        try:
+            curr.execute("delete from fetched_content where url = (?);",
+                         (url, ))
             self._conn.commit()
         except sqlite3.OperationalError as e:
             logging.critical("Removing from DB failed with: %s", e)
@@ -107,7 +107,31 @@ class UrlDb:
             return False
         return len(curr.fetchall()) > 0
 
-    def read(self, max_url_time=None, max_to_fetch=100):
+    def is_content_fetched(self, url):
+        assert len(url) > 0
+        curr = self._conn.cursor()
+        logging.debug("Checking existence of url: %s", url)
+        try:
+            curr.execute("select url from fetched_content where url = (?);",
+                         (url, ))
+        except sqlite3.InterfaceError as e:
+            logging.critical("Checking %s in seen DB failed: %s ", url, e)
+            return False
+        return len(curr.fetchall()) > 0
+
+    def read_one_content_fetched(self, url):
+        assert len(url) > 0
+        curr = self._conn.cursor()
+        logging.debug("Reading of url: %s", url)
+        try:
+            curr.execute("select * from fetched_content where url = (?);",
+                         (url, ))
+        except sqlite3.InterfaceError as e:
+            logging.critical("Reading %s in seen DB failed: %s ", url, e)
+            return False
+        return curr.fetchall()
+
+    def read_from_seen(self, max_url_time=None, max_to_fetch=100):
         if max_url_time is None:
             max_url_time = datetime.datetime.now().isoformat()
         curr = self._conn.cursor()
@@ -125,7 +149,25 @@ class UrlDb:
             logging.critical("Fetching from URL DB failed %s", e)
             return ret_val
         all_fetched = curr.fetchall()
-        logging.info("All items read size: %d", len(all_fetched))
+        logging.info("All items read_from_seen size: %d", len(all_fetched))
+        while len(all_fetched) > 0:
+            ret_val.append(all_fetched.pop()[0])
+        return ret_val
+
+    def read_from_fetched(self, max_to_fetch=100):
+        curr = self._conn.cursor()
+        logging.info("Reading %d urls from fetched content table",
+                     max_to_fetch)
+        ret_val = []
+        try:
+            curr.execute("select url from fetched_content limit (?);",
+                         (max_to_fetch, ))
+        except sqlite3.OperationalError as e:
+            logging.critical("Fetching from fetched content URL DB failed %s",
+                             e)
+            return ret_val
+        all_fetched = curr.fetchall()
+        logging.info("All items from fetched size: %d", len(all_fetched))
         while len(all_fetched) > 0:
             ret_val.append(all_fetched.pop()[0])
         return ret_val
@@ -145,6 +187,17 @@ class UrlDb:
         logging.debug("Checking total number of urls in the crawled DB")
         try:
             curr.execute("select count(*) from crawled_urls;")
+        except sqlite3.OperationalError as e:
+            logging.critical("Checking total urls in DB failed: %s", e)
+            return -1
+        return curr.fetchone()[0]
+
+    def get_total_fetched(self):
+        curr = self._conn.cursor()
+        logging.debug(
+            "Checking total number of urls in the fetched contents DB")
+        try:
+            curr.execute("select count(*) from fetched_content;")
         except sqlite3.OperationalError as e:
             logging.critical("Checking total urls in DB failed: %s", e)
             return -1
@@ -178,7 +231,7 @@ class UrlDb:
                 "create table crawled_urls(url text, seen_time datetime, crawl_time datetime);"
             )
             c.execute(
-                "create table fetched_content(url text, heading text, poem text);"
+                "create table fetched_content(url text, heading text, poem text, headingHash text, poemHash text);"
             )
         except sqlite3.OperationalError as e:
             logging.critical("Resetting the tables failed: %s", e)
