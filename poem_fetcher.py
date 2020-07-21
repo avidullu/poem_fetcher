@@ -52,6 +52,7 @@ class CrawlDriver:
         logging.info("Total URLs in the DB: %d", self._db.get_total_seen())
 
     def _process_url(self, url):
+        url = self._crawler.canonicalize_url(url)
         logging.info("Processing url: %s", url)
 
         # TODO: This should check for the time when this was crawled eg. is_recently_crawled(url)
@@ -98,7 +99,11 @@ class CrawlDriver:
     # Static set of rules for some urls which need not be crawled.
     @staticmethod
     def _should_crawl_url(url):
-        return url.count(':Random') == 0
+        # TODO: Make these comparisons case insensitive
+        return url.count(":Random") == 0 and url.count(
+            "&printable") == 0 and url.count("oldid") == 0 and url.count(
+                "action=") == 0 and url.count(
+                    "mobileaction") == 0 and url.count("returnto")
 
     def _add_new_seen_urls(self):
         a_tags = self._parser.find_all("a")
@@ -150,22 +155,33 @@ def ProcessArgs():
     parser.add_argument(
         '--only_include_base_domain_urls',
         help='Only crawl and process URLs from the base domain.',
-        type=bool,
-        default=True,
+        type=int,
+        choices=[0, 1],
+        default=1,
         required=False)
-    parser.add_argument("--reset_tables",
-                        help='Reset tables before starting run',
-                        type=bool,
-                        default=False,
-                        required=False)
+    parser.add_argument(
+        "--reset_tables",
+        help='Reset tables before starting run',
+        type=int,
+        default=0,
+        choices=[0, 1],  # 0 = false, 1 = true
+        required=False)
     args = parser.parse_args()
-    return vars(args)
+    flags = vars(args)
+    if flags['reset_tables'] == 1:
+        flags['reset_tables'] = True
+    else:
+        flags['reset_tables'] = False
+    if flags['only_include_base_domain_urls'] == 1:
+        flags['only_include_base_domain_urls'] = True
+    else:
+        flags['only_include_base_domain_urls'] = False
+    return flags
 
 
 def main():
     flags = ProcessArgs()
-    print("All flags passed.")
-    [print(f) for f in flags.items()]
+    print("Flags passed: ", flags)
     SetupLogger(flags)
     print("We are starting to crawl ", flags['base_domain'])
     print("We are using", flags['db_path'],

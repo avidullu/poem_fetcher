@@ -1,6 +1,6 @@
 import datetime
 import logging
-from urllib.parse import urlparse, ParseResult
+from urllib.parse import urlparse, ParseResult, unquote
 
 import urllib3
 
@@ -46,12 +46,17 @@ class UrlCrawler:
                                  parsed.params,
                                  parsed.query,
                                  fragment='')  # Empty fragment
-        logging.debug("New formed url: %s", new_parsed.geturl())
-        return new_parsed.geturl()
+        new_url = self.sanitize_url(unquote(new_parsed.geturl()))
+        logging.debug("New formed url: %s", new_url)
+        return new_url
 
     def is_from_base_domain(self, url):
         parsed = urlparse(url, allow_fragments=False)
         return len(parsed.netloc) == 0 or parsed.netloc == self._base.netloc
+
+    @staticmethod
+    def sanitize_url(url):
+        return url.strip('/')
 
     def _reset(self, url):
         self._crawl_time = False
