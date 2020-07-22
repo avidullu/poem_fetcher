@@ -18,6 +18,8 @@ class CrawlDriver:
     _urls_processed = 0
     _content_fetched_urls = 0
     _only_base_domain_urls = False
+    _dropped_urls = 0
+    _total_visited = 0
 
     def __init__(self, db, flags):
         self._db = db
@@ -39,19 +41,23 @@ class CrawlDriver:
         urls = [self._base_url]
         if not self._db.is_seen(self._base_url):
             self._db.add_seen_url(self._base_url)
+        num_new = 0
         while len(
                 urls) > 0 and self._urls_processed < self._max_urls_to_process:
             for u in urls:
                 if self._urls_processed > self._max_urls_to_process:
                     logging.debug("Max number of URLs processed. Skipping.")
                     break
-                self._process_url(u)
+                num_new += self._process_url(u)
             # TODO: Should not fetch this high number of URLs.
             urls = self._get_seen_urls(100000)
             random.shuffle(urls)
         logging.info("Total URLs in the DB: %d", self._db.get_total_seen())
+        print("Total visited: ", self._total_visited, ", num new urls found: ",
+              num_new, "  num fetched: ", self._content_fetched_urls)
 
     def _process_url(self, url):
+        self._total_visited += 1
         url = self._crawler.canonicalize_url(url)
         logging.info("Processing url: %s", url)
 
@@ -61,8 +67,23 @@ class CrawlDriver:
             return 0
 
         if not self._crawler.fetch(url) or self._crawler.get_contents() == '':
-            logging.error("Aborting. Could not fetch base url: %s", url)
-            sys.exit(1)
+            logging.critical("Could not fetch base url: %s", url)
+            # TODO: Update the seen db to reflect that this url is not crawlable instead of dropping
+            if self._db.remove_from_seen(url):
+                self._dropped_urls += 1
+            return 0
+
+        # If this was a redirect, then set to the actual url and add this to the seen table, if eligible
+        if self._crawler.is_redirect():
+            url = self._crawler.canonicalize_url(
+                self._crawler.get_fetched_url())
+            if self._only_base_domain_urls is False or self._crawler.is_from_base_domain(
+                    url):
+                if not self._db.is_seen(url):
+                    self._db.add_seen_url(url)
+            else:
+                logging.debug("Skipping a non domain redirect url: ", url)
+                return 0
 
         # Fetching a url is processing it.
         self._urls_processed += 1
@@ -83,7 +104,8 @@ class CrawlDriver:
             return
         heading = self._parser.find_element('h1', 'class', 'firstHeading')
         poem = self._parser.find_element('div', 'class', 'poem')
-        if heading is None or poem is None:
+        if heading is None or poem is None or len(heading) == 0 or len(
+                poem) == 0:
             logging.debug("Partial content. Skipping adding %s", url)
             return
         heading = self._parser.sanitize_text(heading)
@@ -102,8 +124,16 @@ class CrawlDriver:
         # TODO: Make these comparisons case insensitive
         return url.count(":Random") == 0 and url.count(
             "&printable") == 0 and url.count("oldid") == 0 and url.count(
-                "action=") == 0 and url.count(
-                    "mobileaction") == 0 and url.count("returnto")
+                "&search=") == 0 and url.count("&limit=") == 0 and url.count(
+                    "action="
+                ) == 0 and url.count("mobileaction") == 0 and url.count(
+                    "returnto"
+                ) == 0 and url.count("RecentChangesLinked") == 0 and url.count(
+                    "otherapps"
+                ) == 0 and url.count("hidelinks") == 0 and url.count(
+                    "hideredirs") == 0 and not url.startswith(
+                        "http://kavitakosh.org/share") and not url.startswith(
+                            "http://kavitakosh.org/kk/images")
 
     def _add_new_seen_urls(self):
         a_tags = self._parser.find_all("a")

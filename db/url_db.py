@@ -51,7 +51,7 @@ class UrlDb:
             logging.debug("Both of heading or poem should be available: %s",
                           url)
             return False
-        logging.debug("Inserting crawled url: %s", url)
+        logging.debug("Inserting fetched content url: %s", url)
         try:
             curr.execute("insert into fetched_content values(?, ?, ?, ?, ?);",
                          (url, heading, poem, headingHash, poemHash))

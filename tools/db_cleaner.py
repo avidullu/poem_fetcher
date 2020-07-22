@@ -15,6 +15,7 @@ sys.path.append("../")
 
 from db.url_db import UrlDb
 from parser.parser import Parser
+from crawler.crawler import UrlCrawler
 
 
 # TODO: Pull this into a common library and share
@@ -22,8 +23,16 @@ def should_include_url(url):
     # TODO: Make these comparisons case insensitive
     return url.count(":Random") == 0 and url.count(
         "&printable") == 0 and url.count("oldid") == 0 and url.count(
-            "action=") == 0 and url.count("mobileaction") == 0 and url.count(
-                "returnto")
+            "&search=") == 0 and url.count("&limit=") == 0 and url.count(
+                "action="
+            ) == 0 and url.count("mobileaction") == 0 and url.count(
+                "returnto"
+            ) == 0 and url.count("RecentChangesLinked") == 0 and url.count(
+                "otherapps"
+            ) == 0 and url.count("hidelinks") == 0 and url.count(
+                "hideredirs") == 0 and not url.startswith(
+                    "http://kavitakosh.org/share") and not url.startswith(
+                        "http://kavitakosh.org/kk/images")
 
 
 # TODO: Implement this and integrate with the main pipeline.
@@ -36,6 +45,7 @@ def dedup_db(flags, db):
     num_correct, num_fixed = 0, 0
     for url in all_urls:
         contents = db.read_fetched_content(url, max_to_read=1)
+        assert len(contents[0]) == 5, url
         # record the entire row here
         nurl, heading, poem, hH, pH = contents[0][0], contents[0][1], contents[
             0][2], contents[0][3], contents[0][4]
@@ -43,6 +53,8 @@ def dedup_db(flags, db):
         if len(all_matching_urls) == 1:
             num_correct += 1
             continue
+        logging.debug("Found %d matches for url %s", len(all_matching_urls),
+                      url)
         for murl in all_matching_urls:
             mcontents = db.read_fetched_content(murl, 1)
             assert poem == mcontents[0][2]
@@ -53,8 +65,8 @@ def dedup_db(flags, db):
             if not flags['dry_run']:
                 db.remove_from_fetched(murl)
         if not flags['dry_run']:
-            db.add_from_fetched(nurl, heading, hH, poem, pH)
-        print("Adding: ", nurl, "     ", heading)
+            db.add_fetched_content(nurl, heading, hH, poem, pH)
+        logging.debug("Adding url %s with heading: %s", nurl, heading)
         num_fixed += 1
     print("Num correct: ", num_correct, "  fixed: ", num_fixed)
 
@@ -64,8 +76,9 @@ def sanitize_and_repopulate_fetched_contents(flags, db, parser):
     print("Total urls in fetched content: ", total_fetched_count)
     all_urls = db.read_from_fetched(total_fetched_count)
     num_fixed, num_removed = 0, 0
+    crawler = UrlCrawler('http://kavitakosh.org')
     for url in all_urls:
-        newUrl = unquote(url)
+        newUrl = crawler.sanitize_url(unquote(url))
         if should_include_url(newUrl) is False or should_include_url(
                 url) is False:
             logging.debug("Removing url: %s", url)
@@ -77,7 +90,12 @@ def sanitize_and_repopulate_fetched_contents(flags, db, parser):
         heading, poem = parser.sanitize_text(
             contents[0][1]), parser.sanitize_text(contents[0][2])
         prevHH, prevPH = contents[0][3], contents[0][4]
-        assert len(heading) > 0 and len(poem) > 0
+        if len(heading) == 0 or len(poem) == 0:
+            logging.critical("Empty poem or heading found in DB for %s", url)
+            if not flags['dry_run']:
+                db.remove_from_fetched(url)
+            num_removed += 1
+            continue
         # TODO: Make this a library and use in both code and here.
         headingHash = hashlib.md5(heading.encode()).hexdigest()
         poemHash = hashlib.md5(poem.encode()).hexdigest()
@@ -97,8 +115,9 @@ def sanitize_and_repopulate_seen_urls(flags, db, parser):
     print("Total urls in seen_urls: ", total_seen_count)
     all_urls = db.read_from_seen(max_to_fetch=total_seen_count)
     num_fixed, num_removed = 0, 0
+    crawler = UrlCrawler('http://kavitakosh.org')
     for url in all_urls:
-        newUrl = unquote(url)
+        newUrl = crawler.sanitize_url(unquote(url))
         if should_include_url(newUrl) is False or should_include_url(
                 url) is False:
             logging.debug("Removing url: %s", url)
@@ -106,6 +125,7 @@ def sanitize_and_repopulate_seen_urls(flags, db, parser):
             if not flags['dry_run']:
                 db.remove_from_seen(url)
         elif url != newUrl:
+            print(url, "    ", newUrl)
             if not flags['dry_run']:
                 contents = db.read_seen_url(url)
                 db.remove_from_seen(url)
@@ -121,8 +141,9 @@ def sanitize_and_repopulate_crawled_urls(flags, db, parser):
     print("Total urls in crawled_urls: ", total_crawled_count)
     all_urls = db.read_from_crawled(max_to_fetch=total_crawled_count)
     num_fixed, num_removed = 0, 0
+    crawler = UrlCrawler('http://kavitakosh.org')
     for url in all_urls:
-        newUrl = unquote(url)
+        newUrl = crawler.sanitize_url(unquote(url))
         if should_include_url(newUrl) is False or should_include_url(
                 url) is False:
             logging.debug("Removing url: %s", url)
@@ -130,6 +151,7 @@ def sanitize_and_repopulate_crawled_urls(flags, db, parser):
             if not flags['dry_run']:
                 db.remove_from_crawled(url)
         elif url != newUrl:
+            print(url, "    ", newUrl)
             if not flags['dry_run']:
                 contents = db.read_crawled_url(url)
                 db.remove_from_crawled(url)
