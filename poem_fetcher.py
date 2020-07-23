@@ -1,4 +1,5 @@
 import argparse
+import concurrent.futures
 import hashlib
 import logging
 import random
@@ -21,8 +22,8 @@ class CrawlDriver:
     _dropped_urls = 0
     _total_visited = 0
 
-    def __init__(self, db, flags):
-        self._db = db
+    def __init__(self, flags):
+        self._db = UrlDb(flags['db_path'])
         self._crawler = UrlCrawler(flags['base_domain'])
         self._parser = Parser()
         self._base_url = flags['base_domain']
@@ -50,7 +51,7 @@ class CrawlDriver:
                     break
                 num_new += self._process_url(u)
             # TODO: Should not fetch this high number of URLs.
-            urls = self._get_seen_urls(100000)
+            urls = self._get_seen_urls(100)
             random.shuffle(urls)
         logging.info("Total URLs in the DB: %d", self._db.get_total_seen())
         print("Total visited: ", self._total_visited, ", num new urls found: ",
@@ -116,7 +117,8 @@ class CrawlDriver:
         self._content_fetched_urls += 1
 
     def _get_seen_urls(self, num_to_fetch=100):
-        return self._db.read_from_seen(max_to_fetch=num_to_fetch)
+        return self._db.read_from_seen(max_to_fetch=num_to_fetch,
+                                       order="random")
 
     # Static set of rules for some urls which need not be crawled.
     @staticmethod
@@ -196,6 +198,10 @@ def ProcessArgs():
         default=0,
         choices=[0, 1],  # 0 = false, 1 = true
         required=False)
+    parser.add_argument('--num_threads',
+                        help='Number of threads',
+                        type=int,
+                        default=1)
     args = parser.parse_args()
     flags = vars(args)
     if flags['reset_tables'] == 1:
@@ -216,13 +222,20 @@ def main():
     print("We are starting to crawl ", flags['base_domain'])
     print("We are using", flags['db_path'],
           " as the db to store our information.")
-    db = UrlDb(flags['db_path'])
     if flags['reset_tables'] is True and db.reset_tables() is False:
         logging.critical("Could not reset tables for run. Quitting")
         sys.exit(1)
 
-    driver = CrawlDriver(db, flags)
-    driver.run()
+    flags['max_urls_to_process'] = flags['max_urls_to_process'] / flags[
+        'num_threads'] + 1
+    executor = concurrent.futures.ThreadPoolExecutor(
+        max_workers=flags['num_threads'])
+    run_threads = []
+    for t in range(flags['num_threads']):
+        driver = CrawlDriver(flags)
+        result = executor.submit(driver.run())
+        run_threads.append((driver, result))
+    executor.shutdown()
 
 
 if __name__ == "__main__":

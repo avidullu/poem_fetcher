@@ -187,19 +187,31 @@ class UrlDb:
             ret_val.append(all_fetched.pop()[0])
         return ret_val
 
-    def read_from_seen(self, max_url_time=None, max_to_fetch=100):
-        if max_url_time is None:
+    def read_from_seen(self,
+                       max_to_fetch=100,
+                       order="seen_time",
+                       max_url_time=None):
+        assert order == "random" or order == "seen_time", order
+        if order == "seen_time" and max_url_time is None:
             max_url_time = datetime.datetime.now().isoformat()
+            logging.info("Reading urls which were crawled before: %s",
+                         max_url_time)
+        if order == "random":
+            logging.info("Fetching %d urls from seen_urls in random order",
+                         max_to_fetch)
         curr = self._conn.cursor()
-        logging.info("Reading urls which were crawled before: %s",
-                     max_url_time)
         try:
-            curr.execute(
-                "select url, seen_time from seen_urls where seen_time < (?) order by 2 desc limit (?);",
-                (
-                    max_url_time,
-                    max_to_fetch,
-                ))
+            if order == "seen_time":
+                curr.execute(
+                    "select url, seen_time from seen_urls where seen_time < (?) order by 2 desc limit (?);",
+                    (
+                        max_url_time,
+                        max_to_fetch,
+                    ))
+            elif order == "random":
+                curr.execute(
+                    "select url, seen_time from seen_urls order by random() limit (?);",
+                    (max_to_fetch, ))
         except sqlite3.OperationalError as e:
             logging.critical("Fetching from URL DB failed %s", e)
             return None
