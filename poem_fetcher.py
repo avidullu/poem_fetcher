@@ -51,7 +51,7 @@ class CrawlDriver:
                     break
                 num_new += self._process_url(u)
             # TODO: Should not fetch this high number of URLs.
-            urls = self._get_seen_urls(100)
+            urls = self._get_seen_urls()
             random.shuffle(urls)
         logging.info("Total URLs in the DB: %d", self._db.get_total_seen())
         print("Total visited: ", self._total_visited, ", num new urls found: ",
@@ -116,7 +116,7 @@ class CrawlDriver:
         self._db.add_fetched_content(url, heading, headingHash, poem, poemHash)
         self._content_fetched_urls += 1
 
-    def _get_seen_urls(self, num_to_fetch=100):
+    def _get_seen_urls(self, num_to_fetch=10):
         return self._db.read_from_seen(max_to_fetch=num_to_fetch,
                                        order="random")
 
@@ -214,6 +214,9 @@ def ProcessArgs():
         flags['only_include_base_domain_urls'] = False
     return flags
 
+def MakeAndCallDriver(flags):
+    driver = CrawlDriver(flags)
+    driver.run()
 
 def main():
     flags = ProcessArgs()
@@ -228,14 +231,13 @@ def main():
 
     flags['max_urls_to_process'] = flags['max_urls_to_process'] / flags[
         'num_threads'] + 1
-    executor = concurrent.futures.ThreadPoolExecutor(
-        max_workers=flags['num_threads'])
-    run_threads = []
+    executor = concurrent.futures.ThreadPoolExecutor()
+    results = []
     for t in range(flags['num_threads']):
-        driver = CrawlDriver(flags)
-        result = executor.submit(driver.run())
-        run_threads.append((driver, result))
-    executor.shutdown()
+        results.append(executor.submit(MakeAndCallDriver, flags))
+        print("Started ", t, "th thread.")
+    print("Waiting for completion")
+    executor.shutdown(wait=True)
 
 
 if __name__ == "__main__":
