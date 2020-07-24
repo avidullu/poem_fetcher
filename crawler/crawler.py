@@ -26,13 +26,13 @@ class UrlCrawler:
         resp = self._pool.request('GET', self._url, timeout=5.0)
         status_code = resp.status
         if status_code != 200 and status_code != 302:
-            logging.critical("Fetching %s returned %d", self._url, status_code)
+            logging.debug("Fetching %s returned %d", self._url, status_code)
             return False
         self._contents = resp.data
         if status_code == 302 and resp.geturl(
         ) is not None and resp.geturl() != self._url:
             self._is_redirect = True
-            logging.critical("Redirect found for : %s  at %s", self._url,
+            logging.debug("Redirect found for : %s  at %s", self._url,
                              resp.geturl())
             self._url = resp.geturl()
         return True

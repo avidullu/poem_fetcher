@@ -61,6 +61,21 @@ class UrlDb:
             return False
         return True
 
+    def add_forbidden_url(self, url, seen_time=None):
+        curr = self._conn.cursor()
+        # seen_time can be the same as add time but the crawl time need to be provided by caller
+        if seen_time is None:
+            seen_time = datetime.datetime.now().isoformat()
+        logging.debug("Inserting forbidden url: %s %s", url, seen_time)
+        try:
+            curr.execute("insert into forbidden_urls values(?, ?);",
+                         (url, seen_time,))
+            self._conn.commit()
+        except sqlite3.OperationalError as e:
+            logging.critical("Writing to forbidden DB failed %s", e)
+            return False
+        return True
+
     def remove_from_seen(self, url):
         curr = self._conn.cursor()
         logging.debug("Removing url: %s", url)
@@ -95,16 +110,29 @@ class UrlDb:
             return False
         return True
 
+    def remove_from_forbidden(self, url):
+        curr = self._conn.cursor()
+        logging.debug("Removing url: %s from forbidden_urls", url)
+        try:
+            curr.execute("delete from forbidden_urls where url = (?);", (url, ))
+            self._conn.commit()
+        except sqlite3.OperationalError as e:
+            logging.critical("Removing from forbidden DB failed with: %s", e)
+            return False
+        return True
+
     def is_seen(self, url):
         assert len(url) > 0
         curr = self._conn.cursor()
-        logging.debug("Checking existence of url: %s", url)
+        logging.debug("Checking existence of url in seen_urls : %s", url)
         try:
             curr.execute("select url from seen_urls where url = (?);", (url, ))
         except sqlite3.InterfaceError as e:
             logging.critical("Checking %s in seen DB failed: %s ", url, e)
             return False
-        return len(curr.fetchall()) > 0
+        num_entries = len(curr.fetchall())
+        logging.debug("Number of entries found: %d", num_entries)
+        return num_entries > 0
 
     def is_crawled(self, url):
         assert len(url) > 0
@@ -121,13 +149,24 @@ class UrlDb:
     def is_content_fetched(self, url):
         assert len(url) > 0
         curr = self._conn.cursor()
-        logging.debug("Checking existence of url: %s", url)
+        logging.debug("Checking existence of url in fetched_content: %s", url)
         try:
             curr.execute("select url from fetched_content where url = (?);",
                          (url, ))
         except sqlite3.InterfaceError as e:
             logging.critical("Checking %s in fetched content DB failed: %s ",
                              url, e)
+            return False
+        return len(curr.fetchall()) > 0
+
+    def is_forbidden(self, url):
+        assert len(url) > 0
+        curr = self._conn.cursor()
+        logging.debug("Checking existence of forbidden url: %s", url)
+        try:
+            curr.execute("select url from forbidden_urls where url = (?);", (url, ))
+        except sqlite3.InterfaceError as e:
+            logging.critical("Checking %s in forbidden DB failed: %s ", url, e)
             return False
         return len(curr.fetchall()) > 0
 
@@ -320,6 +359,9 @@ class UrlDb:
             )
             c.execute(
                 "create table crawled_urls(url text, seen_time datetime, crawl_time datetime);"
+            )
+            c.execute(
+                "create table forbidden_urls(url text, seen_time datetime);"
             )
             c.execute(
                 "create table fetched_content(url text, heading text, poem text, headingHash text, poemHash text);"

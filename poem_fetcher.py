@@ -3,7 +3,6 @@ import concurrent.futures
 import hashlib
 import logging
 import random
-import sys
 
 from crawler.crawler import UrlCrawler
 from db.url_db import UrlDb
@@ -21,6 +20,7 @@ class CrawlDriver:
     _only_base_domain_urls = False
     _dropped_urls = 0
     _total_visited = 0
+    _no_contents = 0
 
     def __init__(self, flags):
         self._db = UrlDb(flags['db_path'])
@@ -50,12 +50,11 @@ class CrawlDriver:
                     logging.debug("Max number of URLs processed. Skipping.")
                     break
                 num_new += self._process_url(u)
-            # TODO: Should not fetch this high number of URLs.
-            urls = self._get_seen_urls()
+            urls = self._get_seen_urls(100)
             random.shuffle(urls)
         logging.info("Total URLs in the DB: %d", self._db.get_total_seen())
         print("Total visited: ", self._total_visited, ", num new urls found: ",
-              num_new, "  num fetched: ", self._content_fetched_urls)
+              num_new, "  num fetched: ", self._content_fetched_urls, ", no contents: ", self._no_contents)
 
     def _process_url(self, url):
         self._total_visited += 1
@@ -63,15 +62,15 @@ class CrawlDriver:
         logging.info("Processing url: %s", url)
 
         # TODO: This should check for the time when this was crawled eg. is_recently_crawled(url)
-        if not self._should_crawl_url(url) or self._db.is_crawled(url):
+        if not self._should_crawl_url(url) or self._db.is_crawled(url) or self._db.is_forbidden(url):
             logging.debug("Url crawled or invalid. Skipping.")
             return 0
 
         if not self._crawler.fetch(url) or self._crawler.get_contents() == '':
-            logging.critical("Could not fetch base url: %s", url)
-            # TODO: Update the seen db to reflect that this url is not crawlable instead of dropping
+            logging.info("Could not fetch base url: %s", url)
             if self._db.remove_from_seen(url):
                 self._dropped_urls += 1
+                self._db.add_forbidden_url(url)
             return 0
 
         # If this was a redirect, then set to the actual url and add this to the seen table, if eligible
@@ -86,35 +85,41 @@ class CrawlDriver:
                 logging.debug("Skipping a non domain redirect url: ", url)
                 return 0
 
-        # Fetching a url is processing it.
-        self._urls_processed += 1
         self._parser.set_data(self._crawler.get_contents())
-        num_new = self._add_new_seen_urls()
-
-        # Update the db with the contents of this url
-        self._process_content(url)
-
         # If fails, it's not a critical error to stop processing
         if not self._db.add_crawled_url(url):
             logging.critical("Adding %s to crawled db failed: ", url)
 
-        return num_new
+        # Update the db with the contents of this url.
+        # If the URL is empty contents then skip it and add to forbidden
+        if self._process_content(url) is None:
+             logging.debug("Page is empty. Skipping collecting links.")
+             self._db.add_forbidden_url(url)
+             return 0
+
+        # Counting a url which wasn't empty as processing it.
+        self._urls_processed += 1
+        return self._add_new_seen_urls()
 
     def _process_content(self, url):
-        if self._db.is_content_fetched(url) is True:
-            return
+        assert not self._db.is_content_fetched(url), url
+        no_content = self._parser.find_element('div', 'class', 'noarticletext')
+        if no_content is not None:
+            self._no_contents += 1
+            return None
         heading = self._parser.find_element('h1', 'class', 'firstHeading')
         poem = self._parser.find_element('div', 'class', 'poem')
         if heading is None or poem is None or len(heading) == 0 or len(
                 poem) == 0:
             logging.debug("Partial content. Skipping adding %s", url)
-            return
+            return False
         heading = self._parser.sanitize_text(heading)
         poem = self._parser.sanitize_text(poem)
         headingHash = hashlib.md5(heading.encode()).hexdigest()
         poemHash = hashlib.md5(poem.encode()).hexdigest()
         self._db.add_fetched_content(url, heading, headingHash, poem, poemHash)
         self._content_fetched_urls += 1
+        return True
 
     def _get_seen_urls(self, num_to_fetch=10):
         return self._db.read_from_seen(max_to_fetch=num_to_fetch,
@@ -124,7 +129,7 @@ class CrawlDriver:
     @staticmethod
     def _should_crawl_url(url):
         # TODO: Make these comparisons case insensitive
-        return url.count(":Random") == 0 and url.count(
+        return url.count(":Random") == 0 and url.count("MobileEditor") == 0 and url.count(
             "&printable") == 0 and url.count("oldid") == 0 and url.count(
                 "&search=") == 0 and url.count("&limit=") == 0 and url.count(
                     "action="
@@ -147,7 +152,7 @@ class CrawlDriver:
                 if self._should_crawl_url(url) and (
                         self._only_base_domain_urls is False
                         or self._crawler.is_from_base_domain(url)
-                ) and not self._db.is_seen(url):
+                ) and not self._db.is_seen(url) and not self._db.is_forbidden(url):
                     self._db.add_seen_url(url)
                     num_new += 1
         logging.debug("Number of new URLs found: %s", num_new)
@@ -225,9 +230,9 @@ def main():
     print("We are starting to crawl ", flags['base_domain'])
     print("We are using", flags['db_path'],
           " as the db to store our information.")
-    if flags['reset_tables'] is True and db.reset_tables() is False:
-        logging.critical("Could not reset tables for run. Quitting")
-        sys.exit(1)
+    if flags['reset_tables'] is True:
+        db = UrlDb(flags['db_path'])
+        assert db.reset_tables()
 
     flags['max_urls_to_process'] = flags['max_urls_to_process'] / flags[
         'num_threads'] + 1
