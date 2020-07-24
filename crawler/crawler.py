@@ -33,7 +33,7 @@ class UrlCrawler:
         ) is not None and resp.geturl() != self._url:
             self._is_redirect = True
             logging.debug("Redirect found for : %s  at %s", self._url,
-                             resp.geturl())
+                          resp.geturl())
             self._url = resp.geturl()
         return True
 

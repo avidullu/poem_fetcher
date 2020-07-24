@@ -54,7 +54,8 @@ class CrawlDriver:
             random.shuffle(urls)
         logging.info("Total URLs in the DB: %d", self._db.get_total_seen())
         print("Total visited: ", self._total_visited, ", num new urls found: ",
-              num_new, "  num fetched: ", self._content_fetched_urls, ", no contents: ", self._no_contents)
+              num_new, "  num fetched: ", self._content_fetched_urls,
+              ", no contents: ", self._no_contents)
 
     def _process_url(self, url):
         self._total_visited += 1
@@ -62,7 +63,8 @@ class CrawlDriver:
         logging.info("Processing url: %s", url)
 
         # TODO: This should check for the time when this was crawled eg. is_recently_crawled(url)
-        if not self._should_crawl_url(url) or self._db.is_crawled(url) or self._db.is_forbidden(url):
+        if not self._should_crawl_url(url) or self._db.is_crawled(
+                url) or self._db.is_forbidden(url):
             logging.debug("Url crawled or invalid. Skipping.")
             return 0
 
@@ -93,9 +95,9 @@ class CrawlDriver:
         # Update the db with the contents of this url.
         # If the URL is empty contents then skip it and add to forbidden
         if self._process_content(url) is None:
-             logging.debug("Page is empty. Skipping collecting links.")
-             self._db.add_forbidden_url(url)
-             return 0
+            logging.debug("Page is empty. Skipping collecting links.")
+            self._db.add_forbidden_url(url)
+            return 0
 
         # Counting a url which wasn't empty as processing it.
         self._urls_processed += 1
@@ -129,18 +131,19 @@ class CrawlDriver:
     @staticmethod
     def _should_crawl_url(url):
         # TODO: Make these comparisons case insensitive
-        return url.count(":Random") == 0 and url.count("MobileEditor") == 0 and url.count(
-            "&printable") == 0 and url.count("oldid") == 0 and url.count(
-                "&search=") == 0 and url.count("&limit=") == 0 and url.count(
-                    "action="
-                ) == 0 and url.count("mobileaction") == 0 and url.count(
-                    "returnto"
-                ) == 0 and url.count("RecentChangesLinked") == 0 and url.count(
-                    "otherapps"
-                ) == 0 and url.count("hidelinks") == 0 and url.count(
-                    "hideredirs") == 0 and not url.startswith(
-                        "http://kavitakosh.org/share") and not url.startswith(
-                            "http://kavitakosh.org/kk/images")
+        return url.count(":Random") == 0 and url.count(
+            "MobileEditor"
+        ) == 0 and url.count("&printable") == 0 and url.count(
+            "oldid") == 0 and url.count("&search=") == 0 and url.count(
+                "&limit=") == 0 and url.count("action=") == 0 and url.count(
+                    "mobileaction"
+                ) == 0 and url.count("returnto") == 0 and url.count(
+                    "RecentChangesLinked"
+                ) == 0 and url.count("otherapps") == 0 and url.count(
+                    "hidelinks"
+                ) == 0 and url.count("hideredirs") == 0 and not url.startswith(
+                    "http://kavitakosh.org/share") and not url.startswith(
+                        "http://kavitakosh.org/kk/images")
 
     def _add_new_seen_urls(self):
         a_tags = self._parser.find_all("a")
@@ -152,7 +155,8 @@ class CrawlDriver:
                 if self._should_crawl_url(url) and (
                         self._only_base_domain_urls is False
                         or self._crawler.is_from_base_domain(url)
-                ) and not self._db.is_seen(url) and not self._db.is_forbidden(url):
+                ) and not self._db.is_seen(url) and not self._db.is_forbidden(
+                        url):
                     self._db.add_seen_url(url)
                     num_new += 1
         logging.debug("Number of new URLs found: %s", num_new)
@@ -219,9 +223,11 @@ def ProcessArgs():
         flags['only_include_base_domain_urls'] = False
     return flags
 
+
 def MakeAndCallDriver(flags):
     driver = CrawlDriver(flags)
     driver.run()
+
 
 def main():
     flags = ProcessArgs()

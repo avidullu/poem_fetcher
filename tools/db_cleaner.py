@@ -21,16 +21,16 @@ from crawler.crawler import UrlCrawler
 # TODO: Pull this into a common library and share
 def should_include_url(url):
     # TODO: Make these comparisons case insensitive
-    return url.count(":Random") == 0 and url.count("MobileEditor") == 0 and url.count(
-        "&printable") == 0 and url.count("oldid") == 0 and url.count(
-            "&search=") == 0 and url.count("&limit=") == 0 and url.count(
-                "action="
-            ) == 0 and url.count("mobileaction") == 0 and url.count(
-                "returnto"
-            ) == 0 and url.count("RecentChangesLinked") == 0 and url.count(
-                "otherapps"
-            ) == 0 and url.count("hidelinks") == 0 and url.count(
-                "hideredirs") == 0 and not url.startswith(
+    return url.count(":Random") == 0 and url.count(
+        "MobileEditor") == 0 and url.count("&printable") == 0 and url.count(
+            "oldid") == 0 and url.count("&search=") == 0 and url.count(
+                "&limit=") == 0 and url.count("action=") == 0 and url.count(
+                    "mobileaction"
+                ) == 0 and url.count("returnto") == 0 and url.count(
+                    "RecentChangesLinked"
+                ) == 0 and url.count("otherapps") == 0 and url.count(
+                    "hidelinks"
+                ) == 0 and url.count("hideredirs") == 0 and not url.startswith(
                     "http://kavitakosh.org/share") and not url.startswith(
                         "http://kavitakosh.org/kk/images")
 
