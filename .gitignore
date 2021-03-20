@@ -1,6 +1,7 @@
 *.db
 *.db-journal
-*.exe
+sqlite3/
+gcp-vscode-ssh/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
