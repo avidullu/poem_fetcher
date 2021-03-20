@@ -6,8 +6,7 @@ import random
 
 from crawler.crawler import UrlCrawler
 from db.url_db import UrlDb
-from parser.parser import Parser
-
+from url_parser.url_parser import UrlParser
 
 class CrawlDriver:
     _db = None
@@ -25,7 +24,7 @@ class CrawlDriver:
     def __init__(self, flags):
         self._db = UrlDb(flags['db_path'])
         self._crawler = UrlCrawler(flags['base_domain'])
-        self._parser = Parser()
+        self._parser = UrlParser()
         self._base_url = flags['base_domain']
         self._max_urls_to_process = flags['max_urls_to_process']
         self._only_base_domain_urls = flags['only_include_base_domain_urls']
