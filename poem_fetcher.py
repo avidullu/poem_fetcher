@@ -11,8 +11,8 @@ from url_parser.url_parser import UrlParser
 class CrawlDriver:
     _db = None
     _base_url = None
-    _crawler = None
     _parser = None
+    _crawler = None
     _max_urls_to_process = 0
     _urls_processed = 0
     _content_fetched_urls = 0
