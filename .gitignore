@@ -1,6 +1,6 @@
 *.db
 *.db-journal
-
+*.exe
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
