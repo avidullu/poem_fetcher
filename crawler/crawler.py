@@ -44,7 +44,7 @@ class UrlCrawler:
         return self._crawl_time
 
     def canonicalize_url(self, url):
-        assert url != None and len(url) > 0
+        assert url is not None and len(url) > 0
         parsed = urlparse(url, allow_fragments=False)
         new_parsed = ParseResult(self._base.scheme,
                                  self._base.netloc,
